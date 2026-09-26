@@ -1,4 +1,9 @@
 import os
+import sys
+
+# إضافة مجلد src لمسار بايثون أولاً
+sys.path.append(os.path.join(os.path.dirname(__file__), "src"))
+
 import joblib
 import numpy as np
 import pandas as pd
