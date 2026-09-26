@@ -6,7 +6,7 @@ from sklearn.linear_model import Ridge
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
-from featuers import NYC_BOUNDS, TaxiFeatureEngineer
+from features import NYC_BOUNDS, TaxiFeatureEngineer
 
 TRAIN_DATA_PATH = "Data/train.csv"
 SAVED_MODEL_PATH = "models/ridge_taxi_model.joblib"
