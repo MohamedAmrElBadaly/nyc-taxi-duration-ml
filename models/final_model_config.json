@@ -1,0 +1,20 @@
+{
+  "model": "GradientBoostingRegressor",
+  "target_transformation": "log1p",
+  "feature_engineering": "TaxiFeatureEngineer",
+  "training_data": [
+    "Data/train.csv",
+    "Data/val.csv"
+  ],
+  "test_data_used_for_training": false,
+  "hyperparameters": {
+    "n_estimators": 400,
+    "learning_rate": 0.02,
+    "max_depth": 6,
+    "min_samples_split": 20,
+    "min_samples_leaf": 10,
+    "max_features": "sqrt",
+    "subsample": 0.8,
+    "loss": "huber"
+  }
+}

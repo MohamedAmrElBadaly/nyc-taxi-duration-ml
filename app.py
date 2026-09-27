@@ -1,117 +1,304 @@
 import os
 import sys
-
-# إضافة مجلد src لمسار بايثون أولاً
-sys.path.append(os.path.join(os.path.dirname(__file__), "src"))
-
 import joblib
 import numpy as np
 import pandas as pd
 import streamlit as st
 
+# Add src directory to Python path so custom feature engineering is available.
+sys.path.append(os.path.join(os.path.dirname(__file__), "src"))
+
+
+# ---------------------------------------------------------------------------
+# App configuration
+# ---------------------------------------------------------------------------
 st.set_page_config(
     page_title="NYC Taxi Trip Duration Predictor",
     page_icon="🚕",
-    layout="wide"
+    layout="wide",
 )
 
-MODEL_PATH = "models/ridge_taxi_model.joblib"
+MODEL_PATH = "models/final_gradient_boosting_taxi_model.joblib"
+
+NYC_BOUNDS = {
+    "lat_min": 40.57,
+    "lat_max": 40.92,
+    "lon_min": -74.15,
+    "lon_max": -73.70,
+}
 
 
+# ---------------------------------------------------------------------------
+# Model loading
+# ---------------------------------------------------------------------------
 @st.cache_resource
 def load_model():
     if not os.path.exists(MODEL_PATH):
-        raise FileNotFoundError(f"Model file not found at {MODEL_PATH}")
+        raise FileNotFoundError(
+            f"Final model not found at: {MODEL_PATH}"
+        )
     return joblib.load(MODEL_PATH)
 
+
+# ---------------------------------------------------------------------------
+# Header
+# ---------------------------------------------------------------------------
 st.title("🚕 NYC Taxi Trip Duration Predictor")
-st.markdown(
-    "Predict expected taxi travel time across New York City using regularized linear regression (`Ridge(alpha=1.0)`) "
-    "and real-time spatial-temporal feature extraction."
+st.caption(
+    "End-to-end machine learning system with spatial-temporal feature "
+    "engineering and a tuned Gradient Boosting regression model."
 )
 
-st.sidebar.header("🕒 Trip Date & Settings")
-trip_date = st.sidebar.date_input("Pickup Date", pd.to_datetime("2016-03-15"))
-trip_time = st.sidebar.time_input("Pickup Time", pd.to_datetime("14:30:00").time())
-passenger_count = st.sidebar.slider("Passenger Count", min_value=1, max_value=6, value=1)
-vendor_id = st.sidebar.selectbox("Vendor ID", [1, 2], index=0)
-store_and_fwd = st.sidebar.selectbox("Store and Forward Flag", ["N", "Y"], index=0)
+st.info(
+    "The final model was trained on the cleaned Train + Validation datasets. "
+    "The held-out Test Set is not used by this application."
+)
 
-st.subheader("📍 Coordinates Selection")
+
+# ---------------------------------------------------------------------------
+# Sidebar inputs
+# ---------------------------------------------------------------------------
+st.sidebar.header("🕒 Trip Settings")
+
+trip_date = st.sidebar.date_input(
+    "Pickup Date",
+    value=pd.Timestamp("2016-03-15").date(),
+)
+
+trip_time = st.sidebar.time_input(
+    "Pickup Time",
+    value=pd.Timestamp("14:30:00").time(),
+)
+
+passenger_count = st.sidebar.slider(
+    "Passenger Count",
+    min_value=1,
+    max_value=6,
+    value=1,
+)
+
+vendor_id = st.sidebar.selectbox(
+    "Vendor ID",
+    options=[1, 2],
+    index=0,
+)
+
+store_and_fwd = st.sidebar.selectbox(
+    "Store and Forward Flag",
+    options=["N", "Y"],
+    index=0,
+)
+
+
+# ---------------------------------------------------------------------------
+# Route presets
+# ---------------------------------------------------------------------------
+st.subheader("📍 Trip Route")
+
 preset = st.selectbox(
-    "Choose a Preset Route or Enter Custom Coordinates:",
-    [
+    "Choose a preset route or enter custom coordinates:",
+    options=[
         "Times Square to JFK Airport",
         "Central Park to Wall Street",
         "LaGuardia Airport to Midtown",
-        "Custom"
-    ]
+        "Custom",
+    ],
 )
 
 presets_dict = {
     "Times Square to JFK Airport": {
-        "p_lat": 40.7580, "p_lon": -73.9855,
-        "d_lat": 40.6413, "d_lon": -73.7781
+        "p_lat": 40.7580,
+        "p_lon": -73.9855,
+        "d_lat": 40.6413,
+        "d_lon": -73.7781,
     },
     "Central Park to Wall Street": {
-        "p_lat": 40.785091, "p_lon": -73.968285,
-        "d_lat": 40.707491, "d_lon": -74.011276
+        "p_lat": 40.785091,
+        "p_lon": -73.968285,
+        "d_lat": 40.707491,
+        "d_lon": -74.011276,
     },
     "LaGuardia Airport to Midtown": {
-        "p_lat": 40.7769, "p_lon": -73.8740,
-        "d_lat": 40.7549, "d_lon": -73.9840
-    }
+        "p_lat": 40.7769,
+        "p_lon": -73.8740,
+        "d_lat": 40.7549,
+        "d_lon": -73.9840,
+    },
 }
+
+
+if preset != "Custom":
+    selected_route = presets_dict[preset]
+else:
+    selected_route = {
+        "p_lat": 40.7580,
+        "p_lon": -73.9855,
+        "d_lat": 40.6413,
+        "d_lon": -73.7781,
+    }
+
 
 col1, col2 = st.columns(2)
 
 with col1:
-    st.markdown("### 🟢 Pickup Location")
-    default_plat = presets_dict[preset]["p_lat"] if preset != "Custom" else 40.7580
-    default_plon = presets_dict[preset]["p_lon"] if preset != "Custom" else -73.9855
-    pickup_lat = st.number_input("Pickup Latitude", value=default_plat, format="%.6f")
-    pickup_lon = st.number_input("Pickup Longitude", value=default_plon, format="%.6f")
+    st.markdown("### 🟢 Pickup")
+    pickup_lat = st.number_input(
+        "Pickup Latitude",
+        value=float(selected_route["p_lat"]),
+        format="%.6f",
+    )
+    pickup_lon = st.number_input(
+        "Pickup Longitude",
+        value=float(selected_route["p_lon"]),
+        format="%.6f",
+    )
 
 with col2:
-    st.markdown("### 🔴 Dropoff Location")
-    default_dlat = presets_dict[preset]["d_lat"] if preset != "Custom" else 40.6413
-    default_dlon = presets_dict[preset]["d_lon"] if preset != "Custom" else -73.7781
-    dropoff_lat = st.number_input("Dropoff Latitude", value=default_dlat, format="%.6f")
-    dropoff_lon = st.number_input("Dropoff Longitude", value=default_dlon, format="%.6f")
+    st.markdown("### 🔴 Dropoff")
+    dropoff_lat = st.number_input(
+        "Dropoff Latitude",
+        value=float(selected_route["d_lat"]),
+        format="%.6f",
+    )
+    dropoff_lon = st.number_input(
+        "Dropoff Longitude",
+        value=float(selected_route["d_lon"]),
+        format="%.6f",
+    )
 
-map_data = pd.DataFrame({
-    "lat": [pickup_lat, dropoff_lat],
-    "lon": [pickup_lon, dropoff_lon]
-})
+
+# ---------------------------------------------------------------------------
+# Coordinate validation
+# ---------------------------------------------------------------------------
+def coordinates_are_valid(lat, lon):
+    return (
+        NYC_BOUNDS["lat_min"] <= lat <= NYC_BOUNDS["lat_max"]
+        and NYC_BOUNDS["lon_min"] <= lon <= NYC_BOUNDS["lon_max"]
+    )
+
+
+pickup_valid = coordinates_are_valid(pickup_lat, pickup_lon)
+dropoff_valid = coordinates_are_valid(dropoff_lat, dropoff_lon)
+
+if not pickup_valid:
+    st.warning("Pickup coordinates are outside the configured NYC bounds.")
+
+if not dropoff_valid:
+    st.warning("Dropoff coordinates are outside the configured NYC bounds.")
+
+
+# ---------------------------------------------------------------------------
+# Map
+# ---------------------------------------------------------------------------
+map_data = pd.DataFrame(
+    {
+        "lat": [pickup_lat, dropoff_lat],
+        "lon": [pickup_lon, dropoff_lon],
+    }
+)
+
 st.map(map_data, zoom=11)
 
-if st.button("🚀 Calculate Estimated Duration", type="primary"):
+
+# ---------------------------------------------------------------------------
+# Prediction
+# ---------------------------------------------------------------------------
+if st.button(
+    "🚀 Calculate Estimated Duration",
+    type="primary",
+    use_container_width=True,
+):
+    if not pickup_valid or not dropoff_valid:
+        st.error("Please enter valid NYC coordinates before predicting.")
+        st.stop()
+
     try:
         pipeline = load_model()
 
         pickup_datetime = f"{trip_date} {trip_time}"
 
-        input_data = pd.DataFrame([{
-            "id": "app_query",
-            "vendor_id": vendor_id,
-            "pickup_datetime": pickup_datetime,
-            "passenger_count": passenger_count,
-            "pickup_longitude": pickup_lon,
-            "pickup_latitude": pickup_lat,
-            "dropoff_longitude": dropoff_lon,
-            "dropoff_latitude": dropoff_lat,
-            "store_and_fwd_flag": store_and_fwd
-        }])
+        input_data = pd.DataFrame(
+            [
+                {
+                    "id": "app_query",
+                    "vendor_id": vendor_id,
+                    "pickup_datetime": pickup_datetime,
+                    "passenger_count": passenger_count,
+                    "pickup_longitude": pickup_lon,
+                    "pickup_latitude": pickup_lat,
+                    "dropoff_longitude": dropoff_lon,
+                    "dropoff_latitude": dropoff_lat,
+                    "store_and_fwd_flag": store_and_fwd,
+                }
+            ]
+        )
 
-        log_pred = pipeline.predict(input_data)[0]
-        pred_seconds = np.expm1(log_pred)
-        pred_minutes = pred_seconds / 60.0
+        log_prediction = float(pipeline.predict(input_data)[0])
 
-        st.success("### Prediction Result")
+        predicted_seconds = float(np.expm1(log_prediction))
+        predicted_seconds = float(
+            np.clip(predicted_seconds, 30, 24 * 3600)
+        )
+        predicted_minutes = predicted_seconds / 60.0
+
+        hours = int(predicted_minutes // 60)
+        minutes = int(round(predicted_minutes % 60))
+
+        st.success("### ✅ Prediction Ready")
+
         metric_col1, metric_col2, metric_col3 = st.columns(3)
-        metric_col1.metric("Estimated Time", f"{pred_minutes:.1f} mins")
-        metric_col2.metric("Total Seconds", f"{int(pred_seconds)} sec")
-        metric_col3.metric("Passenger(s)", f"{passenger_count}")
 
-    except Exception as e:
-        st.error(f"Prediction Error: {str(e)}")
+        metric_col1.metric(
+            "Estimated Time",
+            f"{predicted_minutes:.1f} min",
+        )
+
+        metric_col2.metric(
+            "Estimated Seconds",
+            f"{int(round(predicted_seconds)):,}",
+        )
+
+        metric_col3.metric(
+            "Passengers",
+            f"{passenger_count}",
+        )
+
+        if hours > 0:
+            st.write(
+                f"**Estimated trip duration:** approximately "
+                f"{hours} h {minutes} min."
+            )
+        else:
+            st.write(
+                f"**Estimated trip duration:** approximately "
+                f"{minutes} minutes."
+            )
+
+    except Exception as exc:
+        st.error(f"Prediction Error: {exc}")
+
+
+# ---------------------------------------------------------------------------
+# Model information
+# ---------------------------------------------------------------------------
+with st.expander("ℹ️ Model & Project Information"):
+    st.markdown(
+        """
+**Final Model:** Gradient Boosting Regressor
+
+**Target Transformation:** `log1p(trip_duration)`
+
+**Feature Engineering:**
+- Haversine distance
+- Manhattan distance
+- Bearing
+- Log-transformed distance
+- Cyclical hour features
+- Cyclical day-of-week features
+- Weekend indicator
+
+**Training Strategy:** Train + Validation
+
+**Held-out Test Set:** Not used by the app or final training.
+"""
+    )

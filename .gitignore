@@ -1,22 +1,35 @@
-# Python cache
+# Python
 __pycache__/
 *.py[cod]
-*$py.class
-.ipynb_checkpoints/
 
-# Environments
+# Virtual environments
+.venv/
 venv/
 env/
-.env
 
-# Data files (Do not upload large data files to GitHub)
-data/*.csv
-data/*.zip
+# Jupyter
+.ipynb_checkpoints/
 
-# Saved models (Large binary files)
-models/*.joblib
-models/*.pkl
+# VS Code
+.vscode/
 
-# OS files
+# OS
 .DS_Store
 Thumbs.db
+
+# Python cache / logs
+*.log
+*.tmp
+
+# Generated model files
+models/*_taxi_model.joblib
+models/*_random_search.csv
+models/model_comparison.csv
+models/all_model_test_comparison.csv
+
+# Keep final model
+!models/final_gradient_boosting_taxi_model.joblib
+!models/final_model_config.json
+
+# Hidden test data
+Data/test.csv
